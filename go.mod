@@ -1,4 +1,4 @@
-module minifier
+module github.com/syhv-git/minifier
 
 go 1.19
 
