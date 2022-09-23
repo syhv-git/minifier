@@ -1,7 +1,7 @@
 package test
 
 import (
-	"minifier"
+	"github.com/syhv-git/minifier"
 	"os"
 	"testing"
 )
