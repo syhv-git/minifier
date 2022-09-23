@@ -6,3 +6,10 @@ The Minifier performs a recursive walk on directories provided in the variadac s
 > The minifier will ignore the destination file if it exists in the tree being enumerated
 > 
 > The Minifier will not throw an error when handling multiple mime types per call (but your projects will ;)
+
+# Usage
+Run the following command from your project directory
+```
+go get -u github.com/syhv-git/minifier
+```
+You can then import and use the package with the minifier.Minifier() function.
