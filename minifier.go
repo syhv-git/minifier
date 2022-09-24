@@ -27,6 +27,24 @@ func Minifier(fp, mime string, dir ...string) error {
 	e := make(chan error)
 	go walkDir(dir, n, c, e)
 
+wait:
+	for {
+		select {
+		case b, ok := <-c:
+			if !ok {
+				break wait
+			}
+			if _, err := buf.Write(b); err != nil {
+				return err
+			}
+			if err := buf.WriteByte(byte('\n')); err != nil {
+				return err
+			}
+		case err := <-e:
+			panic(err.Error())
+		}
+	}
+
 	min := minify.New()
 	min.AddFunc("text/css", css.Minify)
 	min.AddFunc("text/html", html.Minify)
@@ -34,25 +52,6 @@ func Minifier(fp, mime string, dir ...string) error {
 	min.AddFuncRegexp(regexp.MustCompile("^(application|text)/(x-)?(java|ecma)script$"), js.Minify)
 	min.AddFuncRegexp(regexp.MustCompile("[/+]json$"), json.Minify)
 	min.AddFuncRegexp(regexp.MustCompile("[/+]xml$"), xml.Minify)
-
-wait:
-	for {
-		select {
-		case b, ok := <-c:
-			if _, err := buf.Write(b); err != nil {
-				return err
-			}
-			if err := buf.WriteByte(byte('\n')); err != nil {
-				return err
-			}
-			if !ok {
-				break wait
-			}
-		case err := <-e:
-			panic(err.Error())
-		}
-	}
-
 	tmp, err := min.Bytes(mime, buf.Bytes())
 	if err != nil {
 		return err
@@ -73,39 +72,39 @@ func walkDir(dir []string, ex string, b chan []byte, e chan error) {
 		info, err := os.Stat(d)
 		if err != nil {
 			e <- err
+			return
 		}
 		if info.Name() == ex {
 			continue
 		}
-		if info.IsDir() {
-			nd, _ := os.ReadDir(d)
-			p := handleDir(d, ex, nd)
-
-			c := make(chan []byte)
-			e2 := make(chan error)
-			go walkDir(p, ex, b, e)
-
-		wait2:
-			for {
-				select {
-				case x, ok := <-c:
-					b <- x
-					if !ok {
-						break wait2
-					}
-				case err = <-e2:
-					e <- err
-					return
-				}
+		if !info.IsDir() {
+			tmp, err := os.ReadFile(d)
+			if err != nil {
+				e <- err
 			}
+			b <- tmp
 			continue
 		}
+		nd, _ := os.ReadDir(d)
+		p := handleDir(d, ex, nd)
 
-		tmp, err := os.ReadFile(d)
-		if err != nil {
-			e <- err
+		c := make(chan []byte)
+		e2 := make(chan error)
+		go walkDir(p, ex, b, e)
+
+	wait2:
+		for {
+			select {
+			case x, ok := <-c:
+				if !ok {
+					break wait2
+				}
+				b <- x
+			case err = <-e2:
+				e <- err
+				return
+			}
 		}
-		b <- tmp
 	}
 }
 
