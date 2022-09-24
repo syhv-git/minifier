@@ -10,7 +10,6 @@ import (
 	"github.com/tdewolff/minify/v2/svg"
 	"github.com/tdewolff/minify/v2/xml"
 	"os"
-	"path"
 	"regexp"
 )
 
@@ -21,11 +20,10 @@ import (
 // The function will skip file fp if it is located in dir.
 func Minifier(fp, mime string, dir ...string) error {
 	buf := bytes.NewBuffer(nil)
-	n := path.Base(fp)
 
 	c := make(chan []byte)
 	e := make(chan error)
-	go walkDir(dir, n, c, e)
+	go walkDir(dir, fp, c, e)
 
 wait:
 	for {
@@ -69,13 +67,13 @@ func walkDir(dir []string, ex string, b chan []byte, e chan error) {
 	}
 
 	for _, d := range dir {
+		if d == ex {
+			continue
+		}
 		info, err := os.Stat(d)
 		if err != nil {
 			e <- err
 			return
-		}
-		if info.Name() == ex {
-			continue
 		}
 		if !info.IsDir() {
 			tmp, err := os.ReadFile(d)
@@ -110,10 +108,10 @@ func walkDir(dir []string, ex string, b chan []byte, e chan error) {
 
 func handleDir(d, ex string, c []os.DirEntry) (paths []string) {
 	for _, de := range c {
-		if de.Name() == ex {
+		p := d + "/" + de.Name()
+		if p == ex {
 			continue
 		}
-		p := d + "/" + de.Name()
 		paths = append(paths, p)
 	}
 	return
