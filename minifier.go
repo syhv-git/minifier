@@ -1,7 +1,6 @@
 package minifier
 
 import (
-	"bufio"
 	"bytes"
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
@@ -11,6 +10,7 @@ import (
 	"github.com/tdewolff/minify/v2/svg"
 	"github.com/tdewolff/minify/v2/xml"
 	"os"
+	"path"
 	"regexp"
 )
 
@@ -21,17 +21,11 @@ import (
 // The function will skip file fp if it is located in dir.
 func Minifier(fp, mime string, dir ...string) error {
 	buf := bytes.NewBuffer(nil)
-	f, err := os.Create(fp)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
+	n := path.Base(fp)
 
 	c := make(chan []byte)
 	e := make(chan error)
-	n, _ := f.Stat()
-	go walkDir(dir, n.Name(), c, e)
+	go walkDir(dir, n, c, e)
 
 	min := minify.New()
 	min.AddFunc("text/css", css.Minify)
@@ -45,16 +39,16 @@ wait:
 	for {
 		select {
 		case b, ok := <-c:
-			if _, err = buf.Write(b); err != nil {
+			if _, err := buf.Write(b); err != nil {
 				return err
 			}
-			if err = buf.WriteByte(byte('\n')); err != nil {
+			if err := buf.WriteByte(byte('\n')); err != nil {
 				return err
 			}
 			if !ok {
 				break wait
 			}
-		case err = <-e:
+		case err := <-e:
 			panic(err.Error())
 		}
 	}
@@ -63,10 +57,9 @@ wait:
 	if err != nil {
 		return err
 	}
-	if _, err = w.Write(tmp); err != nil {
+	if err = os.WriteFile(fp, tmp, 0777); err != nil {
 		return err
 	}
-	w.Flush()
 	return nil
 }
 
